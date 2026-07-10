@@ -45,7 +45,7 @@ class NexusApp {
   constructor() {
     this.currentView = 'chronos';
     this.apiKey = localStorage.getItem('gemini_api_key') || '';
-    this.isDarkMode = localStorage.getItem('nexus_theme') !== 'light'; // Padrão agora é escuro (futurista)
+    this.isDarkMode = localStorage.getItem('nexus_theme') !== 'light'; 
     this.init();
   }
 
@@ -54,7 +54,6 @@ class NexusApp {
       navigator.serviceWorker.register('./sw.js').catch(err => console.log(err));
     }
     
-    // Forçar inicialização do modo escuro por padrão se não houver preferência anterior
     if (localStorage.getItem('nexus_theme') === null) {
       localStorage.setItem('nexus_theme', 'dark');
       this.isDarkMode = true;
@@ -89,8 +88,9 @@ class NexusApp {
   }
 
   saveApiKey(key) {
-    this.apiKey = key;
-    localStorage.setItem('gemini_api_key', key);
+    // Remove espaços vazios do início ou do fim para evitar chaves inválidas
+    this.apiKey = key.trim();
+    localStorage.setItem('gemini_api_key', this.apiKey);
     alert('Matriz de chaves sincronizada!');
     this.switchView('chronos');
   }
@@ -225,7 +225,6 @@ class NexusApp {
     const config = MODULE_CONFIGS[moduleName];
     container.innerHTML = `
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Input Terminal -->
         <div class="lg:col-span-1">
           <div class="glass-effect rounded-3xl p-6 border shadow-xl flex flex-col justify-between h-full min-h-[350px]">
             <div>
@@ -249,7 +248,6 @@ class NexusApp {
           </div>
         </div>
 
-        <!-- Output Terminal -->
         <div class="lg:col-span-2">
           <div class="glass-effect rounded-3xl p-6 border shadow-xl min-h-[450px] flex flex-col h-full">
             <div class="border-b border-slate-200 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center">
@@ -273,7 +271,7 @@ class NexusApp {
 
   async callGemini(moduleName) {
     if (!this.apiKey) {
-      alert("Núcleo sem autenticação. Insira a Chave de API.");
+      alert("Núcleo sem autenticação. Insira a Chave de API nas configurações.");
       this.switchView('settings');
       return;
     }
@@ -304,7 +302,19 @@ class NexusApp {
       loading.classList.remove('flex');
       loading.classList.add('hidden');
 
-      if (data.candidates && data.candidates[0].content.parts[0].text) {
+      // NOVO TRATAMENTO DE ERRO: Lê a mensagem direta do Google
+      if (!response.ok) {
+        let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
+        outputArea.innerHTML = `
+          <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
+            <strong>Falha de Conexão com a API:</strong><br><br>
+            <span class="text-xs">${errorMsg}</span><br><br>
+            <span class="text-xs text-slate-400">Dica: Se aparecer "API key not valid", verifique as configurações (ícone superior direito) e cole novamente a sua chave gerada no Google AI Studio.</span>
+          </div>`;
+        return;
+      }
+
+      if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
         let rawText = data.candidates[0].content.parts[0].text;
         
         let textColorClass = moduleName === 'duvidas' ? 'text-slate-300 font-mono' : 'text-slate-800 dark:text-slate-200';
@@ -312,12 +322,12 @@ class NexusApp {
         
         outputArea.innerHTML = `<div class="prose max-w-none ${textColorClass}">${this.formatMarkdown(rawText, strongColorClass)}</div>`;
       } else {
-        outputArea.innerHTML = `<div class="text-red-500 font-mono">Erro de compilação na resposta.</div>`;
+        outputArea.innerHTML = `<div class="text-red-500 font-mono">Erro: O Google bloqueou a resposta por segurança ou retornou dados vazios.</div>`;
       }
     } catch (error) {
       loading.classList.remove('flex');
       loading.classList.add('hidden');
-      outputArea.innerHTML = `<div class="text-red-500 font-mono">Falha na conexão com o núcleo. Teste a chave de segurança.</div>`;
+      outputArea.innerHTML = `<div class="text-red-500 font-mono">Falha na conexão com o núcleo. Verifique sua internet.</div>`;
     }
   }
 
