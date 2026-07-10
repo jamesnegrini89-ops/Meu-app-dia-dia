@@ -303,10 +303,8 @@ class NexusApp {
           throw new Error("Sua chave de API é válida, mas o Google não liberou acesso a nenhum modelo de texto para ela.");
       }
 
-      // LISTA DE PREFERÊNCIAS BLINDADA (Ignora modelos bloqueados e experimentais problemáticos)
+      // LISTA DE PREFERÊNCIAS ALTERADA: Foco exclusivo nos modelos com Plano Gratuito ativo
       const preferencias = [
-        'models/gemini-2.0-flash',
-        'models/gemini-2.0-pro',
         'models/gemini-1.5-flash',
         'models/gemini-1.5-pro',
         'models/gemini-pro',
@@ -321,9 +319,9 @@ class NexusApp {
         }
       }
 
-      // Se nenhum modelo da lista de preferência estiver disponível, ele seleciona qualquer um que NÃO seja o problemático 2.5
       if (!targetModel) {
-        const modelosSeguros = validModels.filter(m => !m.name.includes('2.5-flash') && !m.name.includes('2.5-pro'));
+        // Se nada der certo, usa o primeiro que estiver na lista, excluindo as versões 2.0 que cobram.
+        const modelosSeguros = validModels.filter(m => !m.name.includes('2.0') && !m.name.includes('2.5'));
         targetModel = modelosSeguros.length > 0 ? modelosSeguros[0].name : validModels[0].name;
       }
 
@@ -331,10 +329,18 @@ class NexusApp {
 
       const url = `https://generativelanguage.googleapis.com/v1beta/${targetModel}:generateContent?key=${this.apiKey}`;
       
-      // Formatação universal simplificada que funciona bem em qualquer versão (1.0, 1.5, 2.0)
-      let payload = {
-          contents: [{ role: "user", parts: [{ text: `[INSTRUÇÕES DO SISTEMA]:\n${config.systemInstruction}\n\n[DADOS DO USUÁRIO]:\n${userInput}` }] }]
-      };
+      let payload = {};
+      
+      if (targetModel.includes("1.5")) {
+           payload = {
+              contents: [{ role: "user", parts: [{ text: userInput }] }],
+              systemInstruction: { parts: [{ text: config.systemInstruction }] }
+           };
+      } else {
+           payload = {
+              contents: [{ role: "user", parts: [{ text: `[INSTRUÇÕES DE COMPORTAMENTO DA IA]:\n${config.systemInstruction}\n\n[MENSAGEM DO USUÁRIO]:\n${userInput}` }] }]
+           };
+      }
 
       const response = await fetch(url, {
         method: 'POST',
@@ -349,7 +355,13 @@ class NexusApp {
 
       if (!response.ok) {
         let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
-        throw new Error(errorMsg);
+        
+        // Se bater no erro de Cota (Quota Exceeded / Rate Limit), traduzimos para algo útil
+        if (errorMsg.toLowerCase().includes("quota") || errorMsg.toLowerCase().includes("exceeded")) {
+            throw new Error("Limite de requisições atingido. O Google permite cerca de 15 testes por minuto no plano grátis. Aguarde cerca de 10 a 20 segundos e tente clicar de novo.");
+        } else {
+            throw new Error(errorMsg);
+        }
       }
 
       if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
@@ -367,7 +379,7 @@ class NexusApp {
       if(loadingText) loadingText.innerText = "Processando...";
       outputArea.innerHTML = `
         <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10 shadow-inner">
-            <strong>Falha Crítica Detectada:</strong><br><br>
+            <strong>Aviso de Sistema:</strong><br><br>
             <span class="text-xs">${error.message}</span>
         </div>`;
     }
