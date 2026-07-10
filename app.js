@@ -45,7 +45,8 @@ class NexusApp {
   constructor() {
     this.currentView = 'chronos';
     this.apiKey = localStorage.getItem('gemini_api_key') || '';
-    this.selectedModel = localStorage.getItem('nexus_model') || 'gemini-1.5-flash';
+    // Define o 1.5 Flash Lite (8b) como padrão absoluto, ou o último que você salvou
+    this.selectedModel = localStorage.getItem('nexus_model') || 'gemini-1.5-flash-8b';
     this.isDarkMode = localStorage.getItem('nexus_theme') !== 'light'; 
     this.init();
   }
@@ -103,23 +104,20 @@ class NexusApp {
       if (!res.ok) throw new Error(data.error ? data.error.message : "Erro ao conectar com a API.");
       
       const validModels = data.models.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
-      
       if(validModels.length === 0) throw new Error("A chave é válida, mas o Google bloqueou modelos de texto para ela.");
 
-      let selectHtml = `<label class="block text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-2 mt-4">2. Escolha o Motor Disponível na Lista</label>`;
-      selectHtml += `<select id="model-select" class="w-full px-5 py-4 border border-indigo-200 dark:border-indigo-900/50 rounded-2xl bg-indigo-50/50 dark:bg-indigo-900/20 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner cursor-pointer appearance-none">`;
-      
+      let datalistHtml = '';
       validModels.forEach(m => {
           let name = m.name.replace('models/', '');
-          // Vamos sugerir o 1.5-flash se ele existir, senão o primeiro da lista
-          let selected = (name === this.selectedModel) ? 'selected' : '';
-          selectHtml += `<option value="${name}" ${selected} class="bg-white dark:bg-slate-900">${name}</option>`;
+          datalistHtml += `<option value="${name}"></option>`;
       });
-      selectHtml += `</select>`;
-      selectHtml += `<p class="text-[10px] text-emerald-600 dark:text-emerald-400 mt-2 font-bold flex items-center"><i data-lucide="check-circle" class="w-3 h-3 mr-1"></i>Scanner concluído. Selecione o modelo e salve.</p>`;
 
-      document.getElementById('model-dropdown-container').innerHTML = selectHtml;
-      if(window.lucide) lucide.createIcons();
+      document.getElementById('discovered-models').innerHTML = datalistHtml;
+      
+      // Auto-preenche com a versão Flash Lite 1.5 como sugestão segura
+      document.getElementById('model-select').value = 'gemini-1.5-flash-8b';
+      
+      alert("Scanner concluído! As opções foram carregadas. O sistema preencheu com o gemini-1.5-flash-8b (Flash Lite), pois sabemos que ele funciona e é rápido.");
 
     } catch(e) {
       alert("Falha na busca: " + e.message);
@@ -131,8 +129,7 @@ class NexusApp {
 
   saveSettings() {
     const key = document.getElementById('api-key-input').value.trim();
-    const modelInput = document.getElementById('model-select');
-    const model = modelInput ? modelInput.value.trim() : this.selectedModel;
+    const model = document.getElementById('model-select').value.trim();
     
     if(!key) return alert("A chave de API não pode estar vazia.");
     if(!model) return alert("O modelo não pode estar vazio.");
@@ -204,13 +201,15 @@ class NexusApp {
           
           <button onclick="app.fetchModels(this)" class="w-full bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white py-3.5 rounded-2xl font-bold tracking-wider uppercase text-xs shadow-md transition-all flex items-center justify-center space-x-2">
             <i data-lucide="search" class="w-4 h-4"></i>
-            <span>Buscar Modelos Liberados</span>
+            <span>Buscar Modelos Liberados (Opcional)</span>
           </button>
           
           <div id="model-dropdown-container" class="mt-4">
-              <label class="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">2. Motor Selecionado</label>
-              <input type="text" id="model-select" value="${this.selectedModel}" class="w-full px-5 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/50 dark:bg-slate-900/50 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner">
-              <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-2">Dica: Aperte o botão acima para descobrir quais modelos funcionam para você, ou digite manualmente.</p>
+              <label class="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">2. Digite ou Selecione o Motor</label>
+              <!-- Campo livre para digitação com lista de sugestões -->
+              <input type="text" id="model-select" value="${this.selectedModel}" list="discovered-models" placeholder="ex: gemini-1.5-flash-8b" class="w-full px-5 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/50 dark:bg-slate-900/50 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner">
+              <datalist id="discovered-models"></datalist>
+              <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-2">Dica: O padrão configurado é o "gemini-1.5-flash-8b" (Flash Lite), que costuma ter a melhor taxa de sucesso e cota gratuita.</p>
           </div>
 
           <button onclick="app.saveSettings()" class="w-full bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white py-4 rounded-2xl font-bold tracking-wider uppercase text-xs shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 mt-6">
@@ -352,12 +351,10 @@ class NexusApp {
     outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Conectando ao modelo: ${this.selectedModel}...</div>`;
 
     try {
-      // Usa exatamente o modelo que você selecionou e salvou nas Configurações
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.selectedModel}:generateContent?key=${this.apiKey}`;
       
       let payload = {};
       
-      // Os modelos 1.0 pro são mais primitivos e não aceitam "SystemInstruction" nativo
       if (this.selectedModel.includes("1.5") || this.selectedModel.includes("2.0") || this.selectedModel.includes("2.5")) {
            payload = {
               contents: [{ role: "user", parts: [{ text: userInput }] }],
