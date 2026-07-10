@@ -212,7 +212,7 @@ class NexusApp {
 
             <div id="loading-indicator" class="hidden mt-6 text-xs text-slate-500 items-center justify-center space-x-2">
               <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-indigo-400"></i>
-              <span class="font-mono">Processando requisição analítica...</span>
+              <span class="font-mono" id="loading-text-help">Processando requisição analítica...</span>
             </div>
             <div id="output-area" class="mt-6 text-sm text-slate-300 leading-relaxed font-mono max-h-60 overflow-y-auto border-t border-slate-900 pt-4"></div>
         </div>
@@ -253,7 +253,7 @@ class NexusApp {
               <span class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Painel de Resposta Neural</span>
               <div id="loading-indicator" class="hidden text-xs text-slate-500 dark:text-slate-400 items-center space-x-2">
                 <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin text-indigo-500"></i>
-                <span class="font-mono">Processando...</span>
+                <span class="font-mono" id="loading-text">Processando...</span>
               </div>
             </div>
             <div id="output-area" class="text-slate-800 dark:text-slate-200 text-sm leading-relaxed space-y-4 flex-1 overflow-y-auto pr-2">
@@ -287,7 +287,6 @@ class NexusApp {
     outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais do Gemini...</div>`;
 
     try {
-      // Chamando a versão estável 1.5 Flash diretamente por URL
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
       
       const response = await fetch(url, {
@@ -305,11 +304,6 @@ class NexusApp {
 
       if (!response.ok) {
         let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
-        
-        // Se bater no limite de requisições por minuto do plano grátis
-        if (errorMsg.toLowerCase().includes("quota") || errorMsg.toLowerCase().includes("exceeded") || errorMsg.toLowerCase().includes("rate")) {
-            errorMsg = "Limite de velocidade atingido. O plano gratuito do Google exige um intervalo entre as perguntas. Aguarde 15 segundos e clique em Processar novamente.";
-        }
         
         outputArea.innerHTML = `
           <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
