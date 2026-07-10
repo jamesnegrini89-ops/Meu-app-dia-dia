@@ -41,14 +41,100 @@ const MODULE_CONFIGS = {
   }
 };
 
+
+// Modelo estável com camada gratuita na Gemini Developer API.
+const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+
+// Ordem de preferência para modelos de texto que possuem camada gratuita.
+// A lista efetivamente exibida será cruzada com os modelos liberados para a chave.
+const PREFERRED_FREE_TEXT_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3-flash-preview',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash'
+];
+
+const RETIRED_OR_UNSAFE_DEFAULT_MODELS = [
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+  'gemini-1.5-pro',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-001',
+  'gemini-2.0-flash-lite',
+  'gemini-2.0-flash-lite-001',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-2.5-flash-lite-preview-09-2025'
+];
+
 class NexusApp {
   constructor() {
     this.currentView = 'chronos';
     this.apiKey = localStorage.getItem('gemini_api_key') || '';
-    // Define o 1.5 Flash Lite (8b) como padrão absoluto, ou o último que você salvou
-    this.selectedModel = localStorage.getItem('nexus_model') || 'gemini-1.5-flash-8b';
+
+    const storedModel = this.normalizeModelName(localStorage.getItem('nexus_model') || '');
+    const mustMigrateModel = !storedModel || this.isRetiredModel(storedModel);
+
+    this.selectedModel = mustMigrateModel ? DEFAULT_GEMINI_MODEL : storedModel;
+
+    // Corrige automaticamente instalações que ainda guardaram um modelo antigo no localStorage.
+    if (mustMigrateModel) {
+      localStorage.setItem('nexus_model', this.selectedModel);
+    }
+
     this.isDarkMode = localStorage.getItem('nexus_theme') !== 'light'; 
     this.init();
+  }
+
+  normalizeModelName(modelName) {
+    return String(modelName || '')
+      .trim()
+      .replace(/^models\//, '');
+  }
+
+  isRetiredModel(modelName) {
+    const name = this.normalizeModelName(modelName);
+    return RETIRED_OR_UNSAFE_DEFAULT_MODELS.includes(name) || /^gemini-(1\.5|2\.0)-/i.test(name);
+  }
+
+  isTextGenerationModel(model) {
+    const name = this.normalizeModelName(model && model.name);
+    const methods = model && Array.isArray(model.supportedGenerationMethods)
+      ? model.supportedGenerationMethods
+      : [];
+
+    if (!methods.includes('generateContent')) return false;
+
+    // Exclui motores especializados que não servem para o chat de texto deste app.
+    return !/(embedding|image|imagen|veo|lyria|tts|live|audio|robotics|computer-use|deep-research)/i.test(name);
+  }
+
+  escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    })[char]);
+  }
+
+  getFriendlyApiError(status, apiMessage, modelName) {
+    const message = apiMessage || 'Erro desconhecido da API.';
+
+    if (status === 400) {
+      return `Requisição inválida para o modelo ${modelName}. Detalhes: ${message}`;
+    }
+    if (status === 403) {
+      return `A chave foi recusada. Verifique se ela pertence à Gemini API e se as restrições da chave permitem acesso. Detalhes: ${message}`;
+    }
+    if (status === 404) {
+      return `O modelo ${modelName} não existe, foi desativado ou não está liberado para esta chave. Use “Buscar Modelos Liberados” nas configurações. Detalhes: ${message}`;
+    }
+    if (status === 429) {
+      return `A cota gratuita ou o limite de requisições foi atingido. Aguarde a renovação da cota ou tente outro modelo gratuito liberado. Detalhes: ${message}`;
+    }
+
+    return message;
   }
 
   init() {
@@ -94,45 +180,89 @@ class NexusApp {
     if (!key) return alert("Por favor, cole a chave de API primeiro!");
     
     const originalText = btn.innerHTML;
-    btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block mr-2"></i><span>Acessando Google Cloud...</span>`;
-    if(window.lucide) lucide.createIcons();
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block mr-2"></i><span>Acessando Gemini API...</span>`;
+    if (window.lucide) lucide.createIcons();
 
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error ? data.error.message : "Erro ao conectar com a API.");
-      
-      const validModels = data.models.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
-      if(validModels.length === 0) throw new Error("A chave é válida, mas o Google bloqueou modelos de texto para ela.");
-
-      let datalistHtml = '';
-      validModels.forEach(m => {
-          let name = m.name.replace('models/', '');
-          datalistHtml += `<option value="${name}"></option>`;
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+        headers: {
+          'x-goog-api-key': key
+        }
       });
 
-      document.getElementById('discovered-models').innerHTML = datalistHtml;
-      
-      // Auto-preenche com a versão Flash Lite 1.5 como sugestão segura
-      document.getElementById('model-select').value = 'gemini-1.5-flash-8b';
-      
-      alert("Scanner concluído! As opções foram carregadas. O sistema preencheu com o gemini-1.5-flash-8b (Flash Lite), pois sabemos que ele funciona e é rápido.");
+      const rawBody = await res.text();
+      let data = {};
 
-    } catch(e) {
-      alert("Falha na busca: " + e.message);
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        throw new Error(`A API respondeu em formato inesperado (HTTP ${res.status}).`);
+      }
+      
+      if (!res.ok) {
+        const apiMessage = data.error && data.error.message
+          ? data.error.message
+          : 'Erro ao conectar com a API.';
+        throw new Error(this.getFriendlyApiError(res.status, apiMessage, this.selectedModel));
+      }
+
+      const validModels = Array.isArray(data.models)
+        ? data.models.filter(model => this.isTextGenerationModel(model))
+        : [];
+
+      if (validModels.length === 0) {
+        throw new Error('A chave foi aceita, mas nenhum modelo compatível com geração de texto foi encontrado.');
+      }
+
+      const availableNames = [...new Set(
+        validModels.map(model => this.normalizeModelName(model.name)).filter(Boolean)
+      )];
+
+      // Exibe somente os modelos gratuitos conhecidos, desde que estejam liberados para a chave.
+      const freeAvailableNames = PREFERRED_FREE_TEXT_MODELS.filter(name => availableNames.includes(name));
+      const orderedNames = freeAvailableNames.length > 0
+        ? freeAvailableNames
+        : availableNames.sort();
+
+      const datalistHtml = orderedNames
+        .map(name => `<option value="${this.escapeHtml(name)}"></option>`)
+        .join('');
+
+      document.getElementById('discovered-models').innerHTML = datalistHtml;
+
+      const selectedField = document.getElementById('model-select');
+      const currentModel = this.normalizeModelName(selectedField.value || this.selectedModel);
+      const preferredAvailableModel = PREFERRED_FREE_TEXT_MODELS.find(name => availableNames.includes(name));
+      const nextModel = orderedNames.includes(currentModel)
+        ? currentModel
+        : (preferredAvailableModel || orderedNames[0]);
+
+      selectedField.value = nextModel;
+      this.selectedModel = nextModel;
+
+      const listNotice = freeAvailableNames.length > 0
+        ? 'A lista foi limitada aos modelos gratuitos conhecidos que estão liberados para esta chave.'
+        : 'Nenhum modelo da lista gratuita conhecida apareceu; foram exibidos os modelos de texto liberados para a chave.';
+
+      alert(`Scanner concluído!\nModelo selecionado: ${nextModel}\n\n${listNotice}`);
+
+    } catch (e) {
+      alert('Falha na busca: ' + e.message);
     } finally {
       btn.innerHTML = originalText;
-      if(window.lucide) lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
     }
   }
 
   saveSettings() {
     const key = document.getElementById('api-key-input').value.trim();
-    const model = document.getElementById('model-select').value.trim();
+    const model = this.normalizeModelName(document.getElementById('model-select').value);
     
     if(!key) return alert("A chave de API não pode estar vazia.");
     if(!model) return alert("O modelo não pode estar vazio.");
+    if(this.isRetiredModel(model)) {
+      return alert(`O modelo ${model} foi desativado. Use ${DEFAULT_GEMINI_MODEL} ou clique em “Buscar Modelos Liberados”.`);
+    }
     
     this.apiKey = key;
     this.selectedModel = model;
@@ -207,9 +337,9 @@ class NexusApp {
           <div id="model-dropdown-container" class="mt-4">
               <label class="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">2. Digite ou Selecione o Motor</label>
               <!-- Campo livre para digitação com lista de sugestões -->
-              <input type="text" id="model-select" value="${this.selectedModel}" list="discovered-models" placeholder="ex: gemini-1.5-flash-8b" class="w-full px-5 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/50 dark:bg-slate-900/50 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner">
+              <input type="text" id="model-select" value="${this.selectedModel}" list="discovered-models" placeholder="ex: gemini-3.1-flash-lite" class="w-full px-5 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/50 dark:bg-slate-900/50 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner">
               <datalist id="discovered-models"></datalist>
-              <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-2">Dica: O padrão configurado é o "gemini-1.5-flash-8b" (Flash Lite), que costuma ter a melhor taxa de sucesso e cota gratuita.</p>
+              <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-2">Dica: O padrão configurado é o "gemini-3.1-flash-lite", modelo estável com camada gratuita. A disponibilidade final depende dos modelos liberados para sua chave.</p>
           </div>
 
           <button onclick="app.saveSettings()" class="w-full bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white py-4 rounded-2xl font-bold tracking-wider uppercase text-xs shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 mt-6">
@@ -339,76 +469,127 @@ class NexusApp {
       return;
     }
 
-    const userInput = document.getElementById('module-input').value;
-    if (!userInput.trim()) return;
+    const inputElement = document.getElementById('module-input');
+    const userInput = inputElement ? inputElement.value.trim() : '';
+    if (!userInput) return;
 
     const config = MODULE_CONFIGS[moduleName];
     const loading = document.getElementById('loading-indicator');
     const outputArea = document.getElementById('output-area');
 
+    if (!config || !loading || !outputArea) {
+      console.error('Interface ou configuração do módulo não encontrada:', moduleName);
+      return;
+    }
+
+    const modelName = this.normalizeModelName(this.selectedModel) || DEFAULT_GEMINI_MODEL;
+    this.selectedModel = modelName;
+
     loading.classList.remove('hidden');
     loading.classList.add('flex');
-    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Conectando ao modelo: ${this.selectedModel}...</div>`;
+    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Conectando ao modelo: ${this.escapeHtml(modelName)}...</div>`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.selectedModel}:generateContent?key=${this.apiKey}`;
-      
-      let payload = {};
-      
-      if (this.selectedModel.includes("1.5") || this.selectedModel.includes("2.0") || this.selectedModel.includes("2.5")) {
-           payload = {
-              contents: [{ role: "user", parts: [{ text: userInput }] }],
-              systemInstruction: { parts: [{ text: config.systemInstruction }] }
-           };
-      } else {
-           payload = {
-              contents: [{ role: "user", parts: [{ text: `[INSTRUÇÕES DO SISTEMA]:\n${config.systemInstruction}\n\n[DADOS DO USUÁRIO]:\n${userInput}` }] }]
-           };
-      }
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`;
+
+      // systemInstruction é aceito pelo endpoint generateContent atual; não deve ser limitado às versões 1.5/2.0/2.5.
+      const payload = {
+        systemInstruction: {
+          parts: [{ text: config.systemInstruction }]
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: userInput }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4096
+        }
+      };
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': this.apiKey
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
 
-      const data = await response.json();
-      loading.classList.remove('flex');
-      loading.classList.add('hidden');
+      const rawBody = await response.text();
+      let data = {};
+
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        throw new Error(`A API respondeu em formato inesperado (HTTP ${response.status}).`);
+      }
 
       if (!response.ok) {
-        let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
-        
-        outputArea.innerHTML = `
-          <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
-            <strong>Erro na Resposta do Google:</strong><br><br>
-            <span class="text-xs">${errorMsg}</span>
-          </div>`;
-        return;
+        const apiMessage = data.error && data.error.message
+          ? data.error.message
+          : 'Erro desconhecido da API.';
+        throw new Error(this.getFriendlyApiError(response.status, apiMessage, modelName));
       }
 
-      if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
-        let rawText = data.candidates[0].content.parts[0].text;
-        
-        let textColorClass = moduleName === 'duvidas' ? 'text-slate-300 font-mono' : 'text-slate-800 dark:text-slate-200';
-        let strongColorClass = moduleName === 'duvidas' ? 'text-white' : 'text-indigo-600 dark:text-indigo-400';
-        
+      const candidate = data.candidates && data.candidates[0];
+      const parts = candidate && candidate.content && Array.isArray(candidate.content.parts)
+        ? candidate.content.parts
+        : [];
+
+      // Modelos atuais podem dividir a resposta em várias partes; não assuma que o texto está apenas em parts[0].
+      const rawText = parts
+        .filter(part => typeof part.text === 'string' && part.thought !== true)
+        .map(part => part.text)
+        .join('\n')
+        .trim();
+
+      if (rawText) {
+        const textColorClass = moduleName === 'duvidas'
+          ? 'text-slate-300 font-mono'
+          : 'text-slate-800 dark:text-slate-200';
+        const strongColorClass = moduleName === 'duvidas'
+          ? 'text-white'
+          : 'text-indigo-600 dark:text-indigo-400';
+
         outputArea.innerHTML = `<div class="prose max-w-none ${textColorClass}">${this.formatMarkdown(rawText, strongColorClass)}</div>`;
       } else {
-        outputArea.innerHTML = `<div class="text-red-500 font-mono">Erro: O Google retornou dados vazios.</div>`;
+        const blockReason = data.promptFeedback && data.promptFeedback.blockReason;
+        const finishReason = candidate && candidate.finishReason;
+        const reason = blockReason || finishReason || 'resposta sem conteúdo textual';
+
+        outputArea.innerHTML = `<div class="text-red-500 font-mono">O Google não retornou texto. Motivo: ${this.escapeHtml(reason)}.</div>`;
       }
     } catch (error) {
+      const message = error && error.name === 'AbortError'
+        ? 'A solicitação ultrapassou 45 segundos e foi cancelada. Tente novamente.'
+        : (error && error.message ? error.message : 'Falha desconhecida na conexão.');
+
+      outputArea.innerHTML = `
+        <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
+          <strong>Falha ao consultar o Gemini:</strong><br><br>
+          <span class="text-xs">${this.escapeHtml(message)}</span>
+        </div>`;
+    } finally {
+      clearTimeout(timeoutId);
       loading.classList.remove('flex');
       loading.classList.add('hidden');
-      outputArea.innerHTML = `<div class="text-red-500 font-mono">Falha na conexão de rede. Verifique sua internet.</div>`;
     }
   }
 
   formatMarkdown(text, strongColorClass) {
-    return text
-      .replace(/\n/g, '<br>')
-      .replace(/\*\*(.*?)\*\*/g, `<strong class="font-bold ${strongColorClass}">$1</strong>`)
-      .replace(/\*(.*?)\*/g, '<em class="italic opacity-80">$1</em>');
+    const safeText = this.escapeHtml(text);
+
+    return safeText
+      .replace(/\*\*(.*?)\*\*/gs, `<strong class="font-bold ${strongColorClass}">$1</strong>`)
+      .replace(/\*(.*?)\*/gs, '<em class="italic opacity-80">$1</em>')
+      .replace(/\n/g, '<br>');
   }
 }
 
