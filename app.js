@@ -290,7 +290,6 @@ class NexusApp {
     try {
       if(loadingText) loadingText.innerText = "Mapeando permissões da API...";
       
-      // PASSO 1: O APLICATIVO DESCOBRE QUAL MODELO ELE PODE USAR
       const modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`;
       const modelsResponse = await fetch(modelsUrl);
       const modelsData = await modelsResponse.json();
@@ -299,41 +298,43 @@ class NexusApp {
          throw new Error(modelsData.error ? modelsData.error.message : "Chave de API inválida ou revogada pelo Google.");
       }
 
-      // Filtra apenas os modelos do Google que geram texto
       const validModels = modelsData.models.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
-      
       if (validModels.length === 0) {
           throw new Error("Sua chave de API é válida, mas o Google não liberou acesso a nenhum modelo de texto para ela.");
       }
 
-      // Escolhe o melhor modelo que foi aprovado (preferência para o 1.5 Flash, depois 1.5 Pro, depois 1.0 Pro)
-      let targetModel = validModels[0].name;
-      const flashModel = validModels.find(m => m.name === 'models/gemini-1.5-flash');
-      const proModel = validModels.find(m => m.name === 'models/gemini-1.5-pro');
-      const legacyPro = validModels.find(m => m.name === 'models/gemini-1.0-pro');
-      
-      if (flashModel) targetModel = flashModel.name;
-      else if (proModel) targetModel = proModel.name;
-      else if (legacyPro) targetModel = legacyPro.name;
+      // LISTA DE PREFERÊNCIAS BLINDADA (Ignora modelos bloqueados e experimentais problemáticos)
+      const preferencias = [
+        'models/gemini-2.0-flash',
+        'models/gemini-2.0-pro',
+        'models/gemini-1.5-flash',
+        'models/gemini-1.5-pro',
+        'models/gemini-pro',
+        'models/gemini-1.0-pro'
+      ];
+
+      let targetModel = null;
+      for (const pref of preferencias) {
+        if (validModels.find(m => m.name === pref)) {
+          targetModel = pref;
+          break;
+        }
+      }
+
+      // Se nenhum modelo da lista de preferência estiver disponível, ele seleciona qualquer um que NÃO seja o problemático 2.5
+      if (!targetModel) {
+        const modelosSeguros = validModels.filter(m => !m.name.includes('2.5-flash') && !m.name.includes('2.5-pro'));
+        targetModel = modelosSeguros.length > 0 ? modelosSeguros[0].name : validModels[0].name;
+      }
 
       if(loadingText) loadingText.innerText = `Conectando ao ${targetModel.split('/')[1]}...`;
 
-      // PASSO 2: FAZ A REQUISIÇÃO COM O MODELO PERFEITO
       const url = `https://generativelanguage.googleapis.com/v1beta/${targetModel}:generateContent?key=${this.apiKey}`;
       
-      let payload = {};
-      
-      // O modelo 1.0 Pro mais antigo requer instruções de um jeito diferente dos modelos 1.5
-      if (targetModel.includes("1.5")) {
-           payload = {
-              contents: [{ role: "user", parts: [{ text: userInput }] }],
-              systemInstruction: { parts: [{ text: config.systemInstruction }] }
-           };
-      } else {
-           payload = {
-              contents: [{ role: "user", parts: [{ text: `[INSTRUÇÕES DE COMPORTAMENTO DA IA]:\n${config.systemInstruction}\n\n[MENSAGEM DO USUÁRIO]:\n${userInput}` }] }]
-           };
-      }
+      // Formatação universal simplificada que funciona bem em qualquer versão (1.0, 1.5, 2.0)
+      let payload = {
+          contents: [{ role: "user", parts: [{ text: `[INSTRUÇÕES DO SISTEMA]:\n${config.systemInstruction}\n\n[DADOS DO USUÁRIO]:\n${userInput}` }] }]
+      };
 
       const response = await fetch(url, {
         method: 'POST',
