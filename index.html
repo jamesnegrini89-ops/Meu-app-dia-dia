@@ -1,62 +1,115 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="transition-colors duration-300">
+<html lang="pt-BR" class="class">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nexus Hub</title>
+  <title>Nexus Hub v2.0</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="styles.css">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#020617">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
+      theme: {
+        extend: {
+          animation: {
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'glow': 'glow 2s ease-in-out infinite alternate',
+          }
+        }
+      }
     }
   </script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Efeito de transição global e scroll suave */
+    * { transition: background-color 0.4s ease, border-color 0.4s ease; font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.45);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .dark .glass-effect {
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    @keyframes glow {
+      from { box-shadow: 0 0 5px rgba(99, 102, 241, 0.2); }
+      to { box-shadow: 0 0 20px rgba(99, 102, 241, 0.6); }
+    }
+  </style>
 </head>
-<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
+<body class="bg-slate-100 dark:bg-[#020617] text-slate-900 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col overflow-x-hidden selection:bg-indigo-500 selection:text-white">
 
-  <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50 px-6 py-4 flex justify-between items-center shadow-sm transition-colors duration-300">
-    <div class="flex items-center space-x-3">
-      <div class="p-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl">
-        <i data-lucide="layers" class="w-6 h-6"></i>
+  <!-- Fundo Abstrato Futurista (Orbes de Luz Estilo Sci-Fi) -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-indigo-400/10 dark:bg-indigo-600/10 blur-[120px] animate-pulse-slow"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-cyan-400/10 dark:bg-cyan-600/10 blur-[140px] animate-pulse-slow"></div>
+  </div>
+
+  <!-- Header Aero-Glass -->
+  <header class="glass-effect sticky top-0 z-50 px-6 py-4 flex justify-between items-center shadow-lg border-b border-white/20 dark:border-slate-800/50">
+    <div class="flex items-center space-x-3 group cursor-pointer">
+      <div class="p-2.5 bg-gradient-to-br from-indigo-600 to-cyan-500 text-white rounded-xl shadow-md group-hover:rotate-12 transition-transform duration-300">
+        <i data-lucide="activity" class="w-6 h-6 animate-pulse"></i>
       </div>
-      <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Nexus <span class="text-slate-500 dark:text-slate-400 font-normal">Hub</span></h1>
+      <div>
+        <h1 class="text-xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 dark:from-white dark:via-indigo-200 dark:to-white">
+          NEXUS <span class="text-indigo-600 dark:text-indigo-400 font-light tracking-normal">HUB</span>
+        </h1>
+        <p class="text-[9px] uppercase tracking-widest text-slate-400 dark:text-slate-500 font-bold">Intelligence OS</p>
+      </div>
     </div>
+    
     <div class="flex items-center space-x-2">
-      <button onclick="app.toggleDarkMode()" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition" title="Modo Noturno">
-        <i data-lucide="moon" id="theme-icon" class="w-6 h-6"></i>
+      <!-- Controles de Sistema -->
+      <button onclick="app.toggleDarkMode()" class="p-2.5 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-xl text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-cyan-400 transition-all active:scale-95" title="Alternar Matriz de Luz">
+        <i data-lucide="moon" id="theme-icon" class="w-5 h-5"></i>
       </button>
-      <button onclick="app.switchView('duvidas')" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition" title="Central de Dúvidas">
-        <i data-lucide="help-circle" class="w-6 h-6"></i>
+      <button onclick="app.switchView('duvidas')" class="p-2.5 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-xl text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-cyan-400 transition-all active:scale-95" title="Terminal de Diagnóstico">
+        <i data-lucide="help-circle" class="w-5 h-5"></i>
       </button>
-      <button onclick="app.switchView('settings')" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition" title="Configurações">
-        <i data-lucide="settings" class="w-6 h-6"></i>
+      <button onclick="app.switchView('settings')" class="p-2.5 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-xl text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-cyan-400 transition-all active:scale-95" title="Núcleo de Chaves">
+        <i data-lucide="sliders" class="w-5 h-5"></i>
       </button>
     </div>
   </header>
 
-  <main id="app-content" class="flex-1 max-w-5xl w-full mx-auto p-6 pb-24">
-    </main>
+  <!-- Painel de Exibição Principal -->
+  <main id="app-content" class="flex-1 max-w-6xl w-full mx-auto p-6 pb-28 z-10">
+    <!-- Módulos Injetados -->
+  </main>
 
-  <nav class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 fixed bottom-0 left-0 right-0 py-3 px-4 shadow-lg z-50 transition-colors duration-300">
-    <div class="max-w-md mx-auto flex justify-around items-center">
-      <button onclick="app.switchView('chronos')" class="nav-btn flex flex-col items-center text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition w-1/4">
-        <i data-lucide="calendar-days" class="w-5 h-5"></i>
-        <span class="text-[10px] mt-1 font-medium">Chronos</span>
+  <!-- Dock de Navegação Estilo iOS/Sci-Fi -->
+  <nav class="fixed bottom-6 left-4 right-4 max-w-xl mx-auto glass-effect rounded-2xl py-3 px-4 shadow-2xl border border-white/30 dark:border-slate-700/40 z-50">
+    <div class="flex justify-around items-center">
+      <button onclick="app.switchView('chronos')" class="nav-btn flex flex-col items-center text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all duration-300 transform active:scale-90">
+        <div class="icon-box p-2 rounded-xl transition-all">
+          <i data-lucide="navigation" class="w-5 h-5"></i>
+        </div>
+        <span class="text-[9px] mt-0.5 tracking-wider uppercase font-bold">Chronos</span>
       </button>
-      <button onclick="app.switchView('guardiao')" class="nav-btn flex flex-col items-center text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition w-1/4">
-        <i data-lucide="shield-check" class="w-5 h-5"></i>
-        <span class="text-[10px] mt-1 font-medium">Guardião</span>
+      <button onclick="app.switchView('guardiao')" class="nav-btn flex flex-col items-center text-slate-400 dark:text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all duration-300 transform active:scale-90">
+        <div class="icon-box p-2 rounded-xl transition-all">
+          <i data-lucide="shield" class="w-5 h-5"></i>
+        </div>
+        <span class="text-[9px] mt-0.5 tracking-wider uppercase font-bold">Guardião</span>
       </button>
-      <button onclick="app.switchView('horizonte')" class="nav-btn flex flex-col items-center text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition w-1/4">
-        <i data-lucide="line-chart" class="w-5 h-5"></i>
-        <span class="text-[10px] mt-1 font-medium">Horizonte</span>
+      <button onclick="app.switchView('horizonte')" class="nav-btn flex flex-col items-center text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all duration-300 transform active:scale-90">
+        <div class="icon-box p-2 rounded-xl transition-all">
+          <i data-lucide="trending-up" class="w-5 h-5"></i>
+        </div>
+        <span class="text-[9px] mt-0.5 tracking-wider uppercase font-bold">Horizonte</span>
       </button>
-      <button onclick="app.switchView('filaviva')" class="nav-btn flex flex-col items-center text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition w-1/4">
-        <i data-lucide="users" class="w-5 h-5"></i>
-        <span class="text-[10px] mt-1 font-medium">FilaViva</span>
+      <button onclick="app.switchView('filaviva')" class="nav-btn flex flex-col items-center text-slate-400 dark:text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 transition-all duration-300 transform active:scale-90">
+        <div class="icon-box p-2 rounded-xl transition-all">
+          <i data-lucide="zap" class="w-5 h-5"></i>
+        </div>
+        <span class="text-[9px] mt-0.5 tracking-wider uppercase font-bold">FilaViva</span>
       </button>
     </div>
   </nav>
