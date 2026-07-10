@@ -253,7 +253,7 @@ class NexusApp {
               <span class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Painel de Resposta Neural</span>
               <div id="loading-indicator" class="hidden text-xs text-slate-500 dark:text-slate-400 items-center space-x-2">
                 <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin text-indigo-500"></i>
-                <span class="font-mono">Processando...</span>
+                <span class="font-mono">Descriptografando...</span>
               </div>
             </div>
             <div id="output-area" class="text-slate-800 dark:text-slate-200 text-sm leading-relaxed space-y-4 flex-1 overflow-y-auto pr-2">
@@ -287,7 +287,7 @@ class NexusApp {
     outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais...</div>`;
 
     try {
-      // URL apontando para a versão Flash padrão (sem firulas, a mais estável)
+      // URL oficial e mais atualizada para o Gemini 1.5 Flash
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
       
       const response = await fetch(url, {
@@ -303,12 +303,14 @@ class NexusApp {
       loading.classList.remove('flex');
       loading.classList.add('hidden');
 
+      // Se a resposta vier com erro, imprimimos o motivo exato
       if (!response.ok) {
         let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
         outputArea.innerHTML = `
           <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
             <strong>Falha de Conexão com a API:</strong><br><br>
-            <span class="text-xs">${errorMsg}</span>
+            <span class="text-xs">${errorMsg}</span><br><br>
+            <span class="text-xs text-slate-400"><strong>Importante:</strong> Esse erro indica que sua chave não permite acesso a este modelo. Gere uma nova chave garantindo clicar em "Create API key in a new project".</span>
           </div>`;
         return;
       }
