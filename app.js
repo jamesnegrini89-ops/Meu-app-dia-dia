@@ -88,7 +88,7 @@ class NexusApp {
   }
 
   saveApiKey(key) {
-    this.apiKey = key.trim(); // Trava removida, aceitando qualquer chave válida.
+    this.apiKey = key.trim();
     localStorage.setItem('gemini_api_key', this.apiKey);
     alert('Matriz de chaves sincronizada com sucesso!');
     this.switchView('chronos');
@@ -285,64 +285,74 @@ class NexusApp {
 
     loading.classList.remove('hidden');
     loading.classList.add('flex');
-    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais (1.5 Flash)...</div>`;
+    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Iniciando protocolo de conexão...</div>`;
 
     try {
-      // Tenta primeiro o modelo Flash (passando a chave direto na URL novamente para máxima compatibilidade)
-      let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
+      if(loadingText) loadingText.innerText = "Mapeando permissões da API...";
       
-      let payload = {
-        contents: [{ parts: [{ text: userInput }] }],
-        systemInstruction: { parts: [{ text: config.systemInstruction }] }
-      };
+      // PASSO 1: O APLICATIVO DESCOBRE QUAL MODELO ELE PODE USAR
+      const modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`;
+      const modelsResponse = await fetch(modelsUrl);
+      const modelsData = await modelsResponse.json();
+      
+      if (!modelsResponse.ok) {
+         throw new Error(modelsData.error ? modelsData.error.message : "Chave de API inválida ou revogada pelo Google.");
+      }
 
-      let response = await fetch(url, {
+      // Filtra apenas os modelos do Google que geram texto
+      const validModels = modelsData.models.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
+      
+      if (validModels.length === 0) {
+          throw new Error("Sua chave de API é válida, mas o Google não liberou acesso a nenhum modelo de texto para ela.");
+      }
+
+      // Escolhe o melhor modelo que foi aprovado (preferência para o 1.5 Flash, depois 1.5 Pro, depois 1.0 Pro)
+      let targetModel = validModels[0].name;
+      const flashModel = validModels.find(m => m.name === 'models/gemini-1.5-flash');
+      const proModel = validModels.find(m => m.name === 'models/gemini-1.5-pro');
+      const legacyPro = validModels.find(m => m.name === 'models/gemini-1.0-pro');
+      
+      if (flashModel) targetModel = flashModel.name;
+      else if (proModel) targetModel = proModel.name;
+      else if (legacyPro) targetModel = legacyPro.name;
+
+      if(loadingText) loadingText.innerText = `Conectando ao ${targetModel.split('/')[1]}...`;
+
+      // PASSO 2: FAZ A REQUISIÇÃO COM O MODELO PERFEITO
+      const url = `https://generativelanguage.googleapis.com/v1beta/${targetModel}:generateContent?key=${this.apiKey}`;
+      
+      let payload = {};
+      
+      // O modelo 1.0 Pro mais antigo requer instruções de um jeito diferente dos modelos 1.5
+      if (targetModel.includes("1.5")) {
+           payload = {
+              contents: [{ role: "user", parts: [{ text: userInput }] }],
+              systemInstruction: { parts: [{ text: config.systemInstruction }] }
+           };
+      } else {
+           payload = {
+              contents: [{ role: "user", parts: [{ text: `[INSTRUÇÕES DE COMPORTAMENTO DA IA]:\n${config.systemInstruction}\n\n[MENSAGEM DO USUÁRIO]:\n${userInput}` }] }]
+           };
+      }
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      let data = await response.json();
-
-      // FALLBACK INTELIGENTE: Se der erro de "not found" ou "not supported", redireciona na hora para o modelo base (gemini-pro 1.0)
-      if (!response.ok && data.error && (data.error.message.includes("is not found") || data.error.message.includes("not supported"))) {
-        if(loadingText) loadingText.innerText = "Ajustando para modelo universal...";
-        outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais universais...</div>`;
-        
-        url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${this.apiKey}`;
-        
-        // O gemini-pro (1.0) precisa receber as instruções dentro do próprio texto, pois não tem "systemInstruction"
-        payload = {
-          contents: [{ parts: [{ text: `[INSTRUÇÃO DO SISTEMA E SEU COMPORTAMENTO]:\n${config.systemInstruction}\n\n[DADOS FORNECIDOS PELO USUÁRIO PARA VOCÊ RESOLVER]:\n${userInput}` }] }]
-        };
-
-        response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        
-        data = await response.json();
-      }
-
+      const data = await response.json();
       loading.classList.remove('flex');
       loading.classList.add('hidden');
       if(loadingText) loadingText.innerText = "Processando...";
 
-      // Se ainda assim der erro, mostramos a mensagem do servidor
       if (!response.ok) {
         let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
-        outputArea.innerHTML = `
-          <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
-            <strong>Falha de Conexão com a API:</strong><br><br>
-            <span class="text-xs">${errorMsg}</span>
-          </div>`;
-        return;
+        throw new Error(errorMsg);
       }
 
       if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
         let rawText = data.candidates[0].content.parts[0].text;
-        
         let textColorClass = moduleName === 'duvidas' ? 'text-slate-300 font-mono' : 'text-slate-800 dark:text-slate-200';
         let strongColorClass = moduleName === 'duvidas' ? 'text-white' : 'text-indigo-600 dark:text-indigo-400';
         
@@ -353,7 +363,12 @@ class NexusApp {
     } catch (error) {
       loading.classList.remove('flex');
       loading.classList.add('hidden');
-      outputArea.innerHTML = `<div class="text-red-500 font-mono">Falha na conexão de rede. Verifique sua internet.</div>`;
+      if(loadingText) loadingText.innerText = "Processando...";
+      outputArea.innerHTML = `
+        <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10 shadow-inner">
+            <strong>Falha Crítica Detectada:</strong><br><br>
+            <span class="text-xs">${error.message}</span>
+        </div>`;
     }
   }
 
