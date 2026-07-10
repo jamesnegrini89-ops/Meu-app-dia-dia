@@ -253,7 +253,7 @@ class NexusApp {
               <span class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Painel de Resposta Neural</span>
               <div id="loading-indicator" class="hidden text-xs text-slate-500 dark:text-slate-400 items-center space-x-2">
                 <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin text-indigo-500"></i>
-                <span class="font-mono" id="loading-text">Descriptografando...</span>
+                <span class="font-mono">Processando...</span>
               </div>
             </div>
             <div id="output-area" class="text-slate-800 dark:text-slate-200 text-sm leading-relaxed space-y-4 flex-1 overflow-y-auto pr-2">
@@ -280,7 +280,6 @@ class NexusApp {
 
     const config = MODULE_CONFIGS[moduleName];
     const loading = document.getElementById('loading-indicator');
-    const loadingText = document.getElementById('loading-text');
     const outputArea = document.getElementById('output-area');
 
     loading.classList.remove('hidden');
@@ -288,62 +287,35 @@ class NexusApp {
     outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais...</div>`;
 
     try {
-      // Primeira tentativa: Tenta o modelo 1.5 Flash
-      let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
-      let payload = {
-        contents: [{ parts: [{ text: userInput }] }],
-        systemInstruction: { parts: [{ text: config.systemInstruction }] }
-      };
-
-      let response = await fetch(url, {
+      // URL apontando para a versão Flash padrão (sem firulas, a mais estável)
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: userInput }] }],
+          systemInstruction: { parts: [{ text: config.systemInstruction }] }
+        })
       });
 
-      let data = await response.json();
-
-      // INTERCEPTADOR DE ERROS (O Pulo do Gato)
-      // Se o Google disser que a sua chave não tem o modelo 1.5, ele roda isso:
-      if (!response.ok && data.error && data.error.message.includes("is not found")) {
-        if(loadingText) loadingText.innerText = "Redirecionando para núcleo compatível (gemini-pro)...";
-        
-        // Troca para o modelo base garantido
-        url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${this.apiKey}`;
-        
-        // O modelo base não aceita "systemInstruction", então nós injetamos a inteligência direto no texto
-        payload = {
-          contents: [{ parts: [{ text: `[INSTRUÇÃO DO SISTEMA]: ${config.systemInstruction}\n\n[DADOS DO USUÁRIO]: ${userInput}` }] }]
-        };
-
-        response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        
-        data = await response.json();
-      }
-
+      const data = await response.json();
       loading.classList.remove('flex');
       loading.classList.add('hidden');
-      if(loadingText) loadingText.innerText = "Descriptografando...";
 
-      // Trata erros reais (chave inválida de verdade)
       if (!response.ok) {
         let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
         outputArea.innerHTML = `
           <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
             <strong>Falha de Conexão com a API:</strong><br><br>
-            <span class="text-xs">${errorMsg}</span><br><br>
-            <span class="text-xs text-slate-400">Sua chave é inválida ou foi revogada. Por favor, crie uma chave nova no site do Google AI Studio.</span>
+            <span class="text-xs">${errorMsg}</span>
           </div>`;
         return;
       }
 
-      // Imprime o resultado final
       if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
         let rawText = data.candidates[0].content.parts[0].text;
+        
         let textColorClass = moduleName === 'duvidas' ? 'text-slate-300 font-mono' : 'text-slate-800 dark:text-slate-200';
         let strongColorClass = moduleName === 'duvidas' ? 'text-white' : 'text-indigo-600 dark:text-indigo-400';
         
