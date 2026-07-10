@@ -45,6 +45,7 @@ class NexusApp {
   constructor() {
     this.currentView = 'chronos';
     this.apiKey = localStorage.getItem('gemini_api_key') || '';
+    this.selectedModel = localStorage.getItem('nexus_model') || 'gemini-1.5-flash';
     this.isDarkMode = localStorage.getItem('nexus_theme') !== 'light'; 
     this.init();
   }
@@ -87,10 +88,62 @@ class NexusApp {
     }
   }
 
-  saveApiKey(key) {
-    this.apiKey = key.trim();
+  async fetchModels(btn) {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (!key) return alert("Por favor, cole a chave de API primeiro!");
+    
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block mr-2"></i><span>Acessando Google Cloud...</span>`;
+    if(window.lucide) lucide.createIcons();
+
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error ? data.error.message : "Erro ao conectar com a API.");
+      
+      const validModels = data.models.filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"));
+      
+      if(validModels.length === 0) throw new Error("A chave é válida, mas o Google bloqueou modelos de texto para ela.");
+
+      let selectHtml = `<label class="block text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-2 mt-4">2. Escolha o Motor Disponível na Lista</label>`;
+      selectHtml += `<select id="model-select" class="w-full px-5 py-4 border border-indigo-200 dark:border-indigo-900/50 rounded-2xl bg-indigo-50/50 dark:bg-indigo-900/20 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner cursor-pointer appearance-none">`;
+      
+      validModels.forEach(m => {
+          let name = m.name.replace('models/', '');
+          // Vamos sugerir o 1.5-flash se ele existir, senão o primeiro da lista
+          let selected = (name === this.selectedModel) ? 'selected' : '';
+          selectHtml += `<option value="${name}" ${selected} class="bg-white dark:bg-slate-900">${name}</option>`;
+      });
+      selectHtml += `</select>`;
+      selectHtml += `<p class="text-[10px] text-emerald-600 dark:text-emerald-400 mt-2 font-bold flex items-center"><i data-lucide="check-circle" class="w-3 h-3 mr-1"></i>Scanner concluído. Selecione o modelo e salve.</p>`;
+
+      document.getElementById('model-dropdown-container').innerHTML = selectHtml;
+      if(window.lucide) lucide.createIcons();
+
+    } catch(e) {
+      alert("Falha na busca: " + e.message);
+    } finally {
+      btn.innerHTML = originalText;
+      if(window.lucide) lucide.createIcons();
+    }
+  }
+
+  saveSettings() {
+    const key = document.getElementById('api-key-input').value.trim();
+    const modelInput = document.getElementById('model-select');
+    const model = modelInput ? modelInput.value.trim() : this.selectedModel;
+    
+    if(!key) return alert("A chave de API não pode estar vazia.");
+    if(!model) return alert("O modelo não pode estar vazio.");
+    
+    this.apiKey = key;
+    this.selectedModel = model;
+    
     localStorage.setItem('gemini_api_key', this.apiKey);
-    alert('Matriz de chaves sincronizada com sucesso!');
+    localStorage.setItem('nexus_model', this.selectedModel);
+    
+    alert(`Configuração salva!\nModelo Ativo: ${this.selectedModel}`);
     this.switchView('chronos');
   }
 
@@ -138,18 +191,30 @@ class NexusApp {
             <i data-lucide="sliders" class="w-6 h-6"></i>
           </div>
           <div>
-            <h2 class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-wider">Núcleo de Criptografia</h2>
-            <p class="text-xs text-slate-400 dark:text-slate-400">Autenticação direta com modelos neurais</p>
+            <h2 class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-wider">Núcleo de Sistema</h2>
+            <p class="text-xs text-slate-400 dark:text-slate-400">Scanner de Modelos e Autenticação</p>
           </div>
         </div>
         
-        <div class="space-y-5">
+        <div class="space-y-4">
           <div>
-            <label class="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">Sua Chave de API Gemini</label>
+            <label class="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">1. Cole sua Chave de API</label>
             <input type="password" id="api-key-input" value="${this.apiKey}" placeholder="Cole sua chave aqui..." class="w-full px-5 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/50 dark:bg-slate-900/50 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner">
           </div>
-          <button onclick="app.saveApiKey(document.getElementById('api-key-input').value)" class="w-full bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white py-4 rounded-2xl font-bold tracking-wider uppercase text-xs shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0">
-            Sincronizar Chave
+          
+          <button onclick="app.fetchModels(this)" class="w-full bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white py-3.5 rounded-2xl font-bold tracking-wider uppercase text-xs shadow-md transition-all flex items-center justify-center space-x-2">
+            <i data-lucide="search" class="w-4 h-4"></i>
+            <span>Buscar Modelos Liberados</span>
+          </button>
+          
+          <div id="model-dropdown-container" class="mt-4">
+              <label class="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">2. Motor Selecionado</label>
+              <input type="text" id="model-select" value="${this.selectedModel}" class="w-full px-5 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/50 dark:bg-slate-900/50 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner">
+              <p class="text-[9px] text-slate-400 dark:text-slate-500 mt-2">Dica: Aperte o botão acima para descobrir quais modelos funcionam para você, ou digite manualmente.</p>
+          </div>
+
+          <button onclick="app.saveSettings()" class="w-full bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white py-4 rounded-2xl font-bold tracking-wider uppercase text-xs shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 mt-6">
+            Salvar e Iniciar
           </button>
         </div>
       </div>
@@ -212,7 +277,7 @@ class NexusApp {
 
             <div id="loading-indicator" class="hidden mt-6 text-xs text-slate-500 items-center justify-center space-x-2">
               <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-indigo-400"></i>
-              <span class="font-mono" id="loading-text-help">Processando requisição analítica...</span>
+              <span class="font-mono">Processando requisição...</span>
             </div>
             <div id="output-area" class="mt-6 text-sm text-slate-300 leading-relaxed font-mono max-h-60 overflow-y-auto border-t border-slate-900 pt-4"></div>
         </div>
@@ -253,7 +318,7 @@ class NexusApp {
               <span class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Painel de Resposta Neural</span>
               <div id="loading-indicator" class="hidden text-xs text-slate-500 dark:text-slate-400 items-center space-x-2">
                 <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin text-indigo-500"></i>
-                <span class="font-mono" id="loading-text">Processando...</span>
+                <span class="font-mono">Processando...</span>
               </div>
             </div>
             <div id="output-area" class="text-slate-800 dark:text-slate-200 text-sm leading-relaxed space-y-4 flex-1 overflow-y-auto pr-2">
@@ -270,7 +335,7 @@ class NexusApp {
 
   async callGemini(moduleName) {
     if (!this.apiKey) {
-      alert("Núcleo sem autenticação. Insira a Chave de API nas configurações.");
+      alert("Acesso Negado. Insira a Chave de API nas configurações.");
       this.switchView('settings');
       return;
     }
@@ -284,18 +349,30 @@ class NexusApp {
 
     loading.classList.remove('hidden');
     loading.classList.add('flex');
-    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais do Gemini...</div>`;
+    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Conectando ao modelo: ${this.selectedModel}...</div>`;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
+      // Usa exatamente o modelo que você selecionou e salvou nas Configurações
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.selectedModel}:generateContent?key=${this.apiKey}`;
       
+      let payload = {};
+      
+      // Os modelos 1.0 pro são mais primitivos e não aceitam "SystemInstruction" nativo
+      if (this.selectedModel.includes("1.5") || this.selectedModel.includes("2.0") || this.selectedModel.includes("2.5")) {
+           payload = {
+              contents: [{ role: "user", parts: [{ text: userInput }] }],
+              systemInstruction: { parts: [{ text: config.systemInstruction }] }
+           };
+      } else {
+           payload = {
+              contents: [{ role: "user", parts: [{ text: `[INSTRUÇÕES DO SISTEMA]:\n${config.systemInstruction}\n\n[DADOS DO USUÁRIO]:\n${userInput}` }] }]
+           };
+      }
+
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: userInput }] }],
-          systemInstruction: { parts: [{ text: config.systemInstruction }] }
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
@@ -307,7 +384,7 @@ class NexusApp {
         
         outputArea.innerHTML = `
           <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
-            <strong>Aviso do Servidor Google:</strong><br><br>
+            <strong>Erro na Resposta do Google:</strong><br><br>
             <span class="text-xs">${errorMsg}</span>
           </div>`;
         return;
