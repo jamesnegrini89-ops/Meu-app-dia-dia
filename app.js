@@ -88,7 +88,6 @@ class NexusApp {
   }
 
   saveApiKey(key) {
-    // Remove espaços vazios do início ou do fim para evitar chaves inválidas
     this.apiKey = key.trim();
     localStorage.setItem('gemini_api_key', this.apiKey);
     alert('Matriz de chaves sincronizada!');
@@ -254,7 +253,7 @@ class NexusApp {
               <span class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Painel de Resposta Neural</span>
               <div id="loading-indicator" class="hidden text-xs text-slate-500 dark:text-slate-400 items-center space-x-2">
                 <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin text-indigo-500"></i>
-                <span class="font-mono">Descriptografando...</span>
+                <span class="font-mono" id="loading-text">Descriptografando...</span>
               </div>
             </div>
             <div id="output-area" class="text-slate-800 dark:text-slate-200 text-sm leading-relaxed space-y-4 flex-1 overflow-y-auto pr-2">
@@ -281,54 +280,81 @@ class NexusApp {
 
     const config = MODULE_CONFIGS[moduleName];
     const loading = document.getElementById('loading-indicator');
+    const loadingText = document.getElementById('loading-text');
     const outputArea = document.getElementById('output-area');
 
     loading.classList.remove('hidden');
     loading.classList.add('flex');
-    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais do Gemini e processando dados...</div>`;
+    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais...</div>`;
 
     try {
-      // URL corrigida para a versão principal e mais estável do modelo (gemini-1.5-pro)
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${this.apiKey}`;
-      
-      const response = await fetch(url, {
+      // Primeira tentativa: Tenta o modelo 1.5 Flash
+      let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
+      let payload = {
+        contents: [{ parts: [{ text: userInput }] }],
+        systemInstruction: { parts: [{ text: config.systemInstruction }] }
+      };
+
+      let response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: userInput }] }],
-          systemInstruction: { parts: [{ text: config.systemInstruction }] }
-        })
+        body: JSON.stringify(payload)
       });
 
-      const data = await response.json();
+      let data = await response.json();
+
+      // INTERCEPTADOR DE ERROS (O Pulo do Gato)
+      // Se o Google disser que a sua chave não tem o modelo 1.5, ele roda isso:
+      if (!response.ok && data.error && data.error.message.includes("is not found")) {
+        if(loadingText) loadingText.innerText = "Redirecionando para núcleo compatível (gemini-pro)...";
+        
+        // Troca para o modelo base garantido
+        url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${this.apiKey}`;
+        
+        // O modelo base não aceita "systemInstruction", então nós injetamos a inteligência direto no texto
+        payload = {
+          contents: [{ parts: [{ text: `[INSTRUÇÃO DO SISTEMA]: ${config.systemInstruction}\n\n[DADOS DO USUÁRIO]: ${userInput}` }] }]
+        };
+
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        data = await response.json();
+      }
+
       loading.classList.remove('flex');
       loading.classList.add('hidden');
+      if(loadingText) loadingText.innerText = "Descriptografando...";
 
+      // Trata erros reais (chave inválida de verdade)
       if (!response.ok) {
         let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
         outputArea.innerHTML = `
           <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
             <strong>Falha de Conexão com a API:</strong><br><br>
             <span class="text-xs">${errorMsg}</span><br><br>
-            <span class="text-xs text-slate-400">Dica: Verifique se a sua chave gerada no Google AI Studio está correta e cole novamente na área de configurações.</span>
+            <span class="text-xs text-slate-400">Sua chave é inválida ou foi revogada. Por favor, crie uma chave nova no site do Google AI Studio.</span>
           </div>`;
         return;
       }
 
+      // Imprime o resultado final
       if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
         let rawText = data.candidates[0].content.parts[0].text;
-        
         let textColorClass = moduleName === 'duvidas' ? 'text-slate-300 font-mono' : 'text-slate-800 dark:text-slate-200';
         let strongColorClass = moduleName === 'duvidas' ? 'text-white' : 'text-indigo-600 dark:text-indigo-400';
         
         outputArea.innerHTML = `<div class="prose max-w-none ${textColorClass}">${this.formatMarkdown(rawText, strongColorClass)}</div>`;
       } else {
-        outputArea.innerHTML = `<div class="text-red-500 font-mono">Erro: O Google bloqueou a resposta por segurança ou retornou dados vazios.</div>`;
+        outputArea.innerHTML = `<div class="text-red-500 font-mono">Erro: O Google retornou dados vazios.</div>`;
       }
     } catch (error) {
       loading.classList.remove('flex');
       loading.classList.add('hidden');
-      outputArea.innerHTML = `<div class="text-red-500 font-mono">Falha na conexão com o núcleo. Verifique sua internet ou tente novamente.</div>`;
+      outputArea.innerHTML = `<div class="text-red-500 font-mono">Falha na conexão de rede. Verifique sua internet.</div>`;
     }
   }
 
