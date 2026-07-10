@@ -1,38 +1,43 @@
 const MODULE_CONFIGS = {
   chronos: {
     title: "Chronos Sync",
-    subtitle: "Gestão Inteligente de Escalas e Janelas Familiares",
-    icon: "calendar-days",
-    placeholder: "Insira sua escala de turnos ou rotina familiar da semana aqui...",
-    systemInstruction: "Você é o módulo Chronos Sync AI. Sua especialidade é analisar escalas de trabalho altamente complexas, turnos e rotinas familiares. Seu objetivo é identificar 'janelas de ouro' para o descanso e convívio familiar de alta qualidade. Retorne respostas estruturadas com tabelas de horários ótimos e sugestões de atividades de baixo esforço e alto impacto."
+    subtitle: "Mapeamento Temporal e Sincronização de Escalas",
+    icon: "navigation",
+    color: "from-indigo-500 to-purple-600",
+    placeholder: "Forneça os vetores de turnos operacionais ou janelas domésticas para análise estrutural...",
+    systemInstruction: "Você é a inteligência artificial Chronos Sync. Sua tarefa é otimizar rotinas complexas e escalas de turnos. Forneça análises de tempo limpas, profissionais e altamente organizadas, destacando as janelas ideais de convivência e descanso."
   },
   guardiao: {
     title: "Guardião Preditivo",
-    subtitle: "Manutenção Inteligente de Carro & Casa",
-    icon: "shield-check",
-    placeholder: "Descreva o comportamento do veículo ou parâmetro residencial...",
-    systemInstruction: "Você é o módulo Guardião Preditivo AI. Especialista em diagnósticos DIY automotivos (motores, fluidos, correias) e manutenção residencial técnica (piscinas, climatização). Forneça guias passo a passo claros, listas de ferramentas necessárias e ações preventivas baseadas em dados práticos."
+    subtitle: "Análise de Sistemas e Diagnósticos Técnicos",
+    icon: "shield",
+    color: "from-cyan-500 to-blue-600",
+    placeholder: "Insira telemetria mecânica ou parâmetros residenciais para verificação preditiva...",
+    systemInstruction: "Você é o módulo Guardião Preditivo. Forneça guias operacionais de engenharia e manutenção doméstica extremamente limpos, em listas enumeradas passo a passo, detalhando as ferramentas exatas necessárias para soluções práticas."
   },
   horizonte: {
     title: "Horizonte Líquido",
-    subtitle: "Planejamento Patrimonial de Longo Prazo (Foco 2041)",
-    icon: "line-chart",
-    placeholder: "Digite o aporte atual, variação de taxas ou simulação de metas...",
-    systemInstruction: "Você é o módulo Horizonte Líquido AI. Especialista em estratégias patrimoniais de longo prazo focadas em juros compostos com horizonte até 2041. Traduza eventos de mercado em recalibragem de metas de forma matemática e visual."
+    subtitle: "Projeção Patrimonial e Vetores de Juros Compostos",
+    icon: "trending-up",
+    color: "from-emerald-500 to-teal-600",
+    placeholder: "Insira valores de aportes financeiros, taxas de CDI ou metas estruturais para simulação...",
+    systemInstruction: "Você é o simulador analítico Horizonte Líquido. Traduza variáveis econômicas em modelos preditivos de crescimento patrimonial com foco estratégico de longo prazo. Seja puramente matemático e focado na clareza do avanço temporal."
   },
   filaviva: {
     title: "FilaViva",
-    subtitle: "Motor de Projeção Dinâmica para Atendimentos",
-    icon: "users",
-    placeholder: "Insira o fluxo atual de clientes ou tempo médio de atendimento...",
-    systemInstruction: "Você é o módulo FilaViva AI. Especialista em otimização de fluxos de atendimento, filas em tempo real e agendamentos eficientes. Ajude a calcular previsões exatas de tempo de espera e crie mensagens preditivas para clientes."
+    subtitle: "Simulador de Densidade Dinâmica de Fluxo",
+    icon: "zap",
+    color: "from-amber-500 to-orange-600",
+    placeholder: "Insira a densidade atual da fila e tempo operacional médio de atendimento...",
+    systemInstruction: "Você é o sistema FilaViva. Otimize os fluxos de atendimento com cálculos de probabilidade exatos sobre filas de espera. Escreva modelos de comunicação automotivos ideais para notificar clientes externos."
   },
   duvidas: {
-    title: "Central de Dúvidas & Ajuda",
-    subtitle: "Manual de uso e assistente virtual do Nexus Hub",
+    title: "Terminal de Ajuda",
+    subtitle: "Interface de Suporte e Explicação de Subsistemas",
     icon: "help-circle",
-    placeholder: "Qual sua dúvida sobre como usar uma ferramenta ou qual comando digitar?",
-    systemInstruction: "Você é o assistente de ajuda interno do aplicativo Nexus Hub. Sua função é explicar como usar os 4 módulos principais: Chronos Sync, Guardião Preditivo, Horizonte Líquido e FilaViva. Responda de forma clara, prática e focada em ajudar a extrair o máximo do aplicativo. Forneça exemplos de prompts sempre que útil."
+    color: "from-slate-700 to-slate-900",
+    placeholder: "Qual parâmetro operacional ou instrução de prompt você deseja decodificar?",
+    systemInstruction: "Você é o Terminal de Ajuda integrado. Explique com máxima clareza as mecânicas operacionais de todos os módulos do Nexus Hub."
   }
 };
 
@@ -40,18 +45,25 @@ class NexusApp {
   constructor() {
     this.currentView = 'chronos';
     this.apiKey = localStorage.getItem('gemini_api_key') || '';
-    this.isDarkMode = localStorage.getItem('nexus_theme') === 'dark';
+    this.isDarkMode = localStorage.getItem('nexus_theme') !== 'light'; // Padrão agora é escuro (futurista)
     this.init();
   }
 
   init() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(err => console.log("SW Error:", err));
+      navigator.serviceWorker.register('./sw.js').catch(err => console.log(err));
     }
     
-    // Aplica o tema salvo ao iniciar
+    // Forçar inicialização do modo escuro por padrão se não houver preferência anterior
+    if (localStorage.getItem('nexus_theme') === null) {
+      localStorage.setItem('nexus_theme', 'dark');
+      this.isDarkMode = true;
+    }
+
     if (this.isDarkMode) {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
     
     this.switchView(this.currentView);
@@ -76,14 +88,10 @@ class NexusApp {
     }
   }
 
-  getApiKey() {
-    return this.apiKey;
-  }
-
   saveApiKey(key) {
     this.apiKey = key;
     localStorage.setItem('gemini_api_key', key);
-    alert('Configurações salvas com sucesso!');
+    alert('Matriz de chaves sincronizada!');
     this.switchView('chronos');
   }
 
@@ -101,7 +109,6 @@ class NexusApp {
     
     if (window.lucide) {
       lucide.createIcons();
-      // Garante que o ícone do tema está correto ao renderizar
       const icon = document.getElementById('theme-icon');
       if(icon) icon.setAttribute('data-lucide', this.isDarkMode ? 'sun' : 'moon');
       lucide.createIcons();
@@ -111,35 +118,39 @@ class NexusApp {
 
   updateActiveNav(viewName) {
     document.querySelectorAll('.nav-btn').forEach(btn => {
-      const span = btn.querySelector('span');
+      const box = btn.querySelector('.icon-box');
       if (btn.getAttribute('onclick').includes(viewName)) {
         btn.classList.remove('text-slate-400', 'dark:text-slate-500');
-        btn.classList.add('text-slate-900', 'dark:text-white');
-        if (span) span.classList.add('font-semibold');
+        btn.classList.add('text-indigo-600', 'dark:text-indigo-400');
+        if(box) box.classList.add('bg-indigo-500/10', 'dark:bg-indigo-400/10', 'scale-110');
       } else {
-        btn.classList.remove('text-slate-900', 'dark:text-white');
+        btn.classList.remove('text-indigo-600', 'dark:text-indigo-400');
         btn.classList.add('text-slate-400', 'dark:text-slate-500');
-        if (span) span.classList.remove('font-semibold');
+        if(box) box.classList.remove('bg-indigo-500/10', 'dark:bg-indigo-400/10', 'scale-110');
       }
     });
   }
 
   renderSettings(container) {
     container.innerHTML = `
-      <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm max-w-xl mx-auto transition-colors duration-300">
-        <div class="flex items-center space-x-3 mb-4">
-          <i data-lucide="settings" class="w-6 h-6 text-slate-700 dark:text-slate-300"></i>
-          <h2 class="text-xl font-bold text-slate-900 dark:text-white">Configurações do Sistema</h2>
-        </div>
-        <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Insira sua chave de API do Gemini.</p>
-        
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase mb-2">Chave de API Gemini</label>
-            <input type="password" id="api-key-input" value="${this.apiKey}" placeholder="AIzaSy..." class="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-400 transition-colors">
+      <div class="glass-effect rounded-3xl p-8 border max-w-xl mx-auto shadow-2xl border-white/20 dark:border-slate-700/30">
+        <div class="flex items-center space-x-4 mb-6">
+          <div class="p-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl shadow-md">
+            <i data-lucide="sliders" class="w-6 h-6"></i>
           </div>
-          <button onclick="app.saveApiKey(document.getElementById('api-key-input').value)" class="w-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 py-3 rounded-xl font-medium hover:bg-slate-800 dark:hover:bg-white shadow-sm transition-colors">
-            Salvar Configurações
+          <div>
+            <h2 class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-wider">Núcleo de Criptografia</h2>
+            <p class="text-xs text-slate-400 dark:text-slate-400">Autenticação direta com modelos neurais</p>
+          </div>
+        </div>
+        
+        <div class="space-y-5">
+          <div>
+            <label class="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">Chave de API Gemini</label>
+            <input type="password" id="api-key-input" value="${this.apiKey}" placeholder="AIzaSy..." class="w-full px-5 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/50 dark:bg-slate-900/50 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner">
+          </div>
+          <button onclick="app.saveApiKey(document.getElementById('api-key-input').value)" class="w-full bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white py-4 rounded-2xl font-bold tracking-wider uppercase text-xs shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0">
+            Sincronizar Chave
           </button>
         </div>
       </div>
@@ -149,63 +160,62 @@ class NexusApp {
   renderHelp(container) {
     const config = MODULE_CONFIGS['duvidas'];
     container.innerHTML = `
-      <div class="grid grid-cols-1 gap-6 animate-fadeIn">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300">
-          <div class="flex items-center space-x-3 mb-6">
-            <div class="p-2 bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl">
+      <div class="grid grid-cols-1 gap-8 max-w-4xl mx-auto">
+        <div class="glass-effect rounded-3xl p-8 border shadow-xl">
+          <div class="flex items-center space-x-3 mb-8">
+            <div class="p-3 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl">
               <i data-lucide="book-open" class="w-6 h-6"></i>
             </div>
             <div>
-              <h2 class="text-xl font-bold text-slate-900 dark:text-white">Manual do Nexus Hub</h2>
-              <p class="text-xs text-slate-500 dark:text-slate-400">Como extrair o máximo de cada ferramenta</p>
+              <h2 class="text-xl font-black tracking-wider text-slate-900 dark:text-white uppercase">Arquivos de Instrução</h2>
+              <p class="text-xs text-slate-400">Manual operacional de subsistemas</p>
             </div>
           </div>
           
-          <div class="space-y-6 text-sm text-slate-700 dark:text-slate-300">
-            <div class="border-l-4 border-slate-400 dark:border-slate-500 pl-4">
-              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-1"><i data-lucide="calendar-days" class="w-4 h-4 mr-2 text-slate-500 dark:text-slate-400"></i> Chronos Sync</h3>
-              <p class="mb-2"><strong>Como usar:</strong> Insira seus plantões e horários de folga para buscar as melhores janelas para descansar ou realizar atividades.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+            <div class="p-5 bg-white/30 dark:bg-slate-900/30 rounded-2xl border border-white/20 dark:border-slate-800/50">
+              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-2"><i data-lucide="navigation" class="w-4 h-4 mr-2 text-indigo-500"></i> Chronos Sync</h3>
+              <p class="text-slate-500 dark:text-slate-400 text-xs">Cruza dados brutos de escalas e turnos para isolar janelas ótimas de convivência familiar.</p>
             </div>
-            <div class="border-l-4 border-slate-400 dark:border-slate-500 pl-4">
-              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-1"><i data-lucide="shield-check" class="w-4 h-4 mr-2 text-slate-500 dark:text-slate-400"></i> Guardião Preditivo</h3>
-              <p class="mb-2"><strong>Como usar:</strong> Relate barulhos no motor, necessidade de peças ou cálculos para o pH e cloro da piscina.</p>
+            <div class="p-5 bg-white/30 dark:bg-slate-900/30 rounded-2xl border border-white/20 dark:border-slate-800/50">
+              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-2"><i data-lucide="shield" class="w-4 h-4 mr-2 text-cyan-500"></i> Guardião Preditivo</h3>
+              <p class="text-slate-500 dark:text-slate-400 text-xs">Gera diagnósticos mecânicos preventivos e dosagens químicas estruturadas passo a passo.</p>
             </div>
-            <div class="border-l-4 border-slate-400 dark:border-slate-500 pl-4">
-              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-1"><i data-lucide="line-chart" class="w-4 h-4 mr-2 text-slate-500 dark:text-slate-400"></i> Horizonte Líquido</h3>
-              <p class="mb-2"><strong>Como usar:</strong> Simule o crescimento de aportes para a estratégia de aposentadoria e recalcule metas até 2041.</p>
+            <div class="p-5 bg-white/30 dark:bg-slate-900/30 rounded-2xl border border-white/20 dark:border-slate-800/50">
+              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-2"><i data-lucide="trending-up" class="w-4 h-4 mr-2 text-emerald-500"></i> Horizonte Líquido</h3>
+              <p class="text-slate-500 dark:text-slate-400 text-xs">Simula projeções exatas de crescimento temporal de capital através de modelos matemáticos.</p>
             </div>
-            <div class="border-l-4 border-slate-400 dark:border-slate-500 pl-4">
-              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-1"><i data-lucide="users" class="w-4 h-4 mr-2 text-slate-500 dark:text-slate-400"></i> FilaViva</h3>
-              <p class="mb-2"><strong>Como usar:</strong> Adicione o tempo médio de serviço para descobrir quando o próximo cliente deve ser avisado.</p>
+            <div class="p-5 bg-white/30 dark:bg-slate-900/30 rounded-2xl border border-white/20 dark:border-slate-800/50">
+              <h3 class="font-bold text-slate-900 dark:text-white flex items-center mb-2"><i data-lucide="zap" class="w-4 h-4 mr-2 text-amber-500"></i> FilaViva</h3>
+              <p class="text-slate-500 dark:text-slate-400 text-xs">Processa algoritmos de fluxo para reduzir tempo de espera físico através de notificações preditivas.</p>
             </div>
           </div>
         </div>
 
-        <div class="bg-slate-900 dark:bg-slate-950 text-white rounded-2xl p-6 shadow-sm border border-slate-800 dark:border-slate-800 transition-colors duration-300">
+        <div class="bg-slate-950 text-slate-100 rounded-3xl p-8 shadow-2xl border border-slate-800 animate-glow">
            <div class="flex items-center space-x-3 mb-4">
-              <div class="p-2 bg-slate-800 dark:bg-slate-800 text-white rounded-xl">
-                <i data-lucide="${config.icon}" class="w-5 h-5"></i>
+              <div class="p-2 bg-indigo-600 rounded-xl text-white">
+                <i data-lucide="help-circle" class="w-5 h-5"></i>
               </div>
               <div>
-                <h2 class="text-lg font-bold">${config.title}</h2>
-                <p class="text-xs text-slate-400">${config.subtitle}</p>
+                <h2 class="text-lg font-black uppercase tracking-wider">Terminal Interativo</h2>
+                <p class="text-xs text-slate-500">Consulte qualquer dúvida sobre a inteligência do app</p>
               </div>
             </div>
             
             <div class="mt-4">
-              <textarea id="module-input" rows="4" placeholder="${config.placeholder}" class="w-full p-4 border border-slate-700 rounded-xl bg-slate-800 dark:bg-slate-900 text-sm text-white focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none transition placeholder-slate-500"></textarea>
+              <textarea id="module-input" rows="3" placeholder="${config.placeholder}" class="w-full p-4 border border-slate-800 rounded-2xl bg-slate-900 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition placeholder-slate-600 font-mono"></textarea>
             </div>
 
-            <button onclick="app.callGemini('duvidas')" class="w-full mt-4 bg-white dark:bg-slate-200 text-slate-900 py-3 rounded-xl font-bold flex items-center justify-center space-x-2 hover:bg-slate-200 dark:hover:bg-white transition shadow-sm">
-              <i data-lucide="sparkles" class="w-4 h-4"></i>
-              <span>Perguntar ao Assistente Virtual</span>
+            <button onclick="app.callGemini('duvidas')" class="w-full mt-4 bg-gradient-to-r from-indigo-600 to-indigo-800 text-white py-3.5 rounded-2xl font-bold uppercase text-xs tracking-widest hover:brightness-110 transition shadow-lg">
+              Executar Consulta
             </button>
 
-            <div id="loading-indicator" class="hidden mt-6 text-xs text-slate-400 items-center justify-center space-x-2">
-              <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
-              <span>Analisando sua dúvida...</span>
+            <div id="loading-indicator" class="hidden mt-6 text-xs text-slate-500 items-center justify-center space-x-2">
+              <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-indigo-400"></i>
+              <span class="font-mono">Processando requisição analítica...</span>
             </div>
-            <div id="output-area" class="mt-6 text-sm text-slate-300 leading-relaxed max-h-64 overflow-y-auto"></div>
+            <div id="output-area" class="mt-6 text-sm text-slate-300 leading-relaxed font-mono max-h-60 overflow-y-auto border-t border-slate-900 pt-4"></div>
         </div>
       </div>
     `;
@@ -214,41 +224,45 @@ class NexusApp {
   renderModule(moduleName, container) {
     const config = MODULE_CONFIGS[moduleName];
     container.innerHTML = `
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
-        <div class="lg:col-span-1 space-y-6">
-          <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300">
-            <div class="flex items-center space-x-3 mb-3">
-              <div class="p-2 bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl">
-                <i data-lucide="${config.icon}" class="w-5 h-5"></i>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Input Terminal -->
+        <div class="lg:col-span-1">
+          <div class="glass-effect rounded-3xl p-6 border shadow-xl flex flex-col justify-between h-full min-h-[350px]">
+            <div>
+              <div class="flex items-center space-x-3 mb-4">
+                <div class="p-3 bg-gradient-to-br ${config.color} text-white rounded-2xl shadow-md">
+                  <i data-lucide="${config.icon}" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h2 class="text-lg font-black text-slate-900 dark:text-white tracking-wide uppercase">${config.title}</h2>
+                  <p class="text-[10px] text-slate-400 dark:text-slate-400 uppercase font-bold tracking-wider">${config.subtitle}</p>
+                </div>
               </div>
-              <div>
-                <h2 class="text-lg font-bold text-slate-900 dark:text-white">${config.title}</h2>
-                <p class="text-xs text-slate-400 dark:text-slate-400">${config.subtitle}</p>
+              <div class="mt-4">
+                <textarea id="module-input" rows="7" placeholder="${config.placeholder}" class="w-full p-4 border border-slate-200 dark:border-slate-700/60 rounded-2xl bg-white/50 dark:bg-slate-900/30 text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none transition shadow-inner"></textarea>
               </div>
             </div>
-            <div class="mt-4">
-              <textarea id="module-input" rows="6" placeholder="${config.placeholder}" class="w-full p-4 border border-slate-200 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900 text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-400 resize-none transition-colors"></textarea>
-            </div>
-            <button onclick="app.callGemini('${moduleName}')" class="w-full mt-4 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 py-3 rounded-xl font-medium flex items-center justify-center space-x-2 hover:bg-slate-800 dark:hover:bg-white transition-colors shadow-sm">
-              <i data-lucide="sparkles" class="w-4 h-4"></i>
-              <span>Consultar Nexus AI</span>
+            <button onclick="app.callGemini('${moduleName}')" class="w-full mt-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl font-bold uppercase tracking-wider text-xs shadow-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-all flex items-center justify-center space-x-2">
+              <i data-lucide="cpu" class="w-4 h-4"></i>
+              <span>Processar Matriz</span>
             </button>
           </div>
         </div>
 
+        <!-- Output Terminal -->
         <div class="lg:col-span-2">
-          <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm min-h-[400px] flex flex-col transition-colors duration-300">
-            <div class="border-b border-slate-100 dark:border-slate-700 pb-3 mb-4 flex justify-between items-center">
-              <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Painel Analítico Contextual</span>
-              <div id="loading-indicator" class="hidden text-xs text-slate-500 dark:text-slate-400 items-center space-x-1">
-                <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>
-                <span>Processando...</span>
+          <div class="glass-effect rounded-3xl p-6 border shadow-xl min-h-[450px] flex flex-col h-full">
+            <div class="border-b border-slate-200 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center">
+              <span class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Painel de Resposta Neural</span>
+              <div id="loading-indicator" class="hidden text-xs text-slate-500 dark:text-slate-400 items-center space-x-2">
+                <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin text-indigo-500"></i>
+                <span class="font-mono">Descriptografando...</span>
               </div>
             </div>
-            <div id="output-area" class="text-slate-700 dark:text-slate-300 text-sm leading-relaxed space-y-4 flex-1 overflow-y-auto">
-              <div class="text-slate-400 dark:text-slate-500 text-center py-12">
-                <i data-lucide="arrow-left-right" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
-                Insira os dados ao lado para ativar a IA.
+            <div id="output-area" class="text-slate-800 dark:text-slate-200 text-sm leading-relaxed space-y-4 flex-1 overflow-y-auto pr-2">
+              <div class="text-slate-400 dark:text-slate-600 text-center py-24">
+                <i data-lucide="terminal" class="w-10 h-10 mx-auto mb-3 opacity-30 animate-pulse"></i>
+                Aguardando vetor de entrada para inicialização.
               </div>
             </div>
           </div>
@@ -259,13 +273,13 @@ class NexusApp {
 
   async callGemini(moduleName) {
     if (!this.apiKey) {
-      alert("Por favor, insira sua chave de API nas configurações.");
+      alert("Núcleo sem autenticação. Insira a Chave de API.");
       this.switchView('settings');
       return;
     }
 
     const userInput = document.getElementById('module-input').value;
-    if (!userInput.trim()) return alert("Preencha o campo antes de processar.");
+    if (!userInput.trim()) return;
 
     const config = MODULE_CONFIGS[moduleName];
     const loading = document.getElementById('loading-indicator');
@@ -273,7 +287,7 @@ class NexusApp {
 
     loading.classList.remove('hidden');
     loading.classList.add('flex');
-    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500">Processando...</div>`;
+    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais do Gemini e processando dados...</div>`;
 
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
@@ -293,26 +307,17 @@ class NexusApp {
       if (data.candidates && data.candidates[0].content.parts[0].text) {
         let rawText = data.candidates[0].content.parts[0].text;
         
-        // Define as cores do texto baseando-se se estamos no módulo de ajuda (fundo escuro fixo) ou nos outros módulos (fundo dinâmico)
-        let textColorClass = '';
-        let strongColorClass = '';
-        
-        if (moduleName === 'duvidas') {
-          textColorClass = 'text-slate-200';
-          strongColorClass = 'text-white';
-        } else {
-          textColorClass = 'text-slate-800 dark:text-slate-300';
-          strongColorClass = 'text-slate-900 dark:text-white';
-        }
+        let textColorClass = moduleName === 'duvidas' ? 'text-slate-300 font-mono' : 'text-slate-800 dark:text-slate-200';
+        let strongColorClass = moduleName === 'duvidas' ? 'text-white' : 'text-indigo-600 dark:text-indigo-400';
         
         outputArea.innerHTML = `<div class="prose max-w-none ${textColorClass}">${this.formatMarkdown(rawText, strongColorClass)}</div>`;
       } else {
-        outputArea.innerHTML = `<div class="text-red-500 dark:text-red-400">Erro de formato.</div>`;
+        outputArea.innerHTML = `<div class="text-red-500 font-mono">Erro de compilação na resposta.</div>`;
       }
     } catch (error) {
       loading.classList.remove('flex');
       loading.classList.add('hidden');
-      outputArea.innerHTML = `<div class="text-red-500 dark:text-red-400">Erro de API. Verifique a chave.</div>`;
+      outputArea.innerHTML = `<div class="text-red-500 font-mono">Falha na conexão com o núcleo. Teste a chave de segurança.</div>`;
     }
   }
 
@@ -320,7 +325,7 @@ class NexusApp {
     return text
       .replace(/\n/g, '<br>')
       .replace(/\*\*(.*?)\*\*/g, `<strong class="font-bold ${strongColorClass}">$1</strong>`)
-      .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+      .replace(/\*(.*?)\*/g, '<em class="italic opacity-80">$1</em>');
   }
 }
 
