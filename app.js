@@ -288,7 +288,9 @@ class NexusApp {
     outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais do Gemini e processando dados...</div>`;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${this.apiKey}`;
+      // URL corrigida para a versão principal e mais estável do modelo (gemini-1.5-pro)
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${this.apiKey}`;
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -302,14 +304,13 @@ class NexusApp {
       loading.classList.remove('flex');
       loading.classList.add('hidden');
 
-      // NOVO TRATAMENTO DE ERRO: Lê a mensagem direta do Google
       if (!response.ok) {
         let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
         outputArea.innerHTML = `
           <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
             <strong>Falha de Conexão com a API:</strong><br><br>
             <span class="text-xs">${errorMsg}</span><br><br>
-            <span class="text-xs text-slate-400">Dica: Se aparecer "API key not valid", verifique as configurações (ícone superior direito) e cole novamente a sua chave gerada no Google AI Studio.</span>
+            <span class="text-xs text-slate-400">Dica: Verifique se a sua chave gerada no Google AI Studio está correta e cole novamente na área de configurações.</span>
           </div>`;
         return;
       }
@@ -327,7 +328,7 @@ class NexusApp {
     } catch (error) {
       loading.classList.remove('flex');
       loading.classList.add('hidden');
-      outputArea.innerHTML = `<div class="text-red-500 font-mono">Falha na conexão com o núcleo. Verifique sua internet.</div>`;
+      outputArea.innerHTML = `<div class="text-red-500 font-mono">Falha na conexão com o núcleo. Verifique sua internet ou tente novamente.</div>`;
     }
   }
 
