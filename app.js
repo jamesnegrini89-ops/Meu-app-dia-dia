@@ -88,9 +88,9 @@ class NexusApp {
   }
 
   saveApiKey(key) {
-    this.apiKey = key.trim();
+    this.apiKey = key.trim(); // Trava removida, aceitando qualquer chave válida.
     localStorage.setItem('gemini_api_key', this.apiKey);
-    alert('Matriz de chaves sincronizada!');
+    alert('Matriz de chaves sincronizada com sucesso!');
     this.switchView('chronos');
   }
 
@@ -145,8 +145,8 @@ class NexusApp {
         
         <div class="space-y-5">
           <div>
-            <label class="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">Chave de API Gemini</label>
-            <input type="password" id="api-key-input" value="${this.apiKey}" placeholder="AIzaSy..." class="w-full px-5 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/50 dark:bg-slate-900/50 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner">
+            <label class="block text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-widest mb-2">Sua Chave de API Gemini</label>
+            <input type="password" id="api-key-input" value="${this.apiKey}" placeholder="Cole sua chave aqui..." class="w-full px-5 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl bg-white/50 dark:bg-slate-900/50 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner">
           </div>
           <button onclick="app.saveApiKey(document.getElementById('api-key-input').value)" class="w-full bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white py-4 rounded-2xl font-bold tracking-wider uppercase text-xs shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0">
             Sincronizar Chave
@@ -212,7 +212,7 @@ class NexusApp {
 
             <div id="loading-indicator" class="hidden mt-6 text-xs text-slate-500 items-center justify-center space-x-2">
               <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-indigo-400"></i>
-              <span class="font-mono">Processando requisição analítica...</span>
+              <span class="font-mono" id="loading-text-help">Processando requisição analítica...</span>
             </div>
             <div id="output-area" class="mt-6 text-sm text-slate-300 leading-relaxed font-mono max-h-60 overflow-y-auto border-t border-slate-900 pt-4"></div>
         </div>
@@ -253,7 +253,7 @@ class NexusApp {
               <span class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Painel de Resposta Neural</span>
               <div id="loading-indicator" class="hidden text-xs text-slate-500 dark:text-slate-400 items-center space-x-2">
                 <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin text-indigo-500"></i>
-                <span class="font-mono">Descriptografando...</span>
+                <span class="font-mono" id="loading-text">Processando...</span>
               </div>
             </div>
             <div id="output-area" class="text-slate-800 dark:text-slate-200 text-sm leading-relaxed space-y-4 flex-1 overflow-y-auto pr-2">
@@ -280,37 +280,62 @@ class NexusApp {
 
     const config = MODULE_CONFIGS[moduleName];
     const loading = document.getElementById('loading-indicator');
+    const loadingText = document.getElementById('loading-text') || document.getElementById('loading-text-help');
     const outputArea = document.getElementById('output-area');
 
     loading.classList.remove('hidden');
     loading.classList.add('flex');
-    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais...</div>`;
+    outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais (1.5 Flash)...</div>`;
 
     try {
-      // URL oficial e mais atualizada para o Gemini 1.5 Flash
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
+      // Tenta primeiro o modelo Flash (passando a chave direto na URL novamente para máxima compatibilidade)
+      let url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`;
       
-      const response = await fetch(url, {
+      let payload = {
+        contents: [{ parts: [{ text: userInput }] }],
+        systemInstruction: { parts: [{ text: config.systemInstruction }] }
+      };
+
+      let response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: userInput }] }],
-          systemInstruction: { parts: [{ text: config.systemInstruction }] }
-        })
+        body: JSON.stringify(payload)
       });
 
-      const data = await response.json();
+      let data = await response.json();
+
+      // FALLBACK INTELIGENTE: Se der erro de "not found" ou "not supported", redireciona na hora para o modelo base (gemini-pro 1.0)
+      if (!response.ok && data.error && (data.error.message.includes("is not found") || data.error.message.includes("not supported"))) {
+        if(loadingText) loadingText.innerText = "Ajustando para modelo universal...";
+        outputArea.innerHTML = `<div class="text-slate-400 dark:text-slate-500 font-mono animate-pulse">Acessando servidores neurais universais...</div>`;
+        
+        url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${this.apiKey}`;
+        
+        // O gemini-pro (1.0) precisa receber as instruções dentro do próprio texto, pois não tem "systemInstruction"
+        payload = {
+          contents: [{ parts: [{ text: `[INSTRUÇÃO DO SISTEMA E SEU COMPORTAMENTO]:\n${config.systemInstruction}\n\n[DADOS FORNECIDOS PELO USUÁRIO PARA VOCÊ RESOLVER]:\n${userInput}` }] }]
+        };
+
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        data = await response.json();
+      }
+
       loading.classList.remove('flex');
       loading.classList.add('hidden');
+      if(loadingText) loadingText.innerText = "Processando...";
 
-      // Se a resposta vier com erro, imprimimos o motivo exato
+      // Se ainda assim der erro, mostramos a mensagem do servidor
       if (!response.ok) {
         let errorMsg = data.error && data.error.message ? data.error.message : "Erro desconhecido da API.";
         outputArea.innerHTML = `
           <div class="text-red-500 dark:text-red-400 font-mono border border-red-500/30 p-4 rounded-xl bg-red-500/10">
             <strong>Falha de Conexão com a API:</strong><br><br>
-            <span class="text-xs">${errorMsg}</span><br><br>
-            <span class="text-xs text-slate-400"><strong>Importante:</strong> Esse erro indica que sua chave não permite acesso a este modelo. Gere uma nova chave garantindo clicar em "Create API key in a new project".</span>
+            <span class="text-xs">${errorMsg}</span>
           </div>`;
         return;
       }
